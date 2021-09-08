@@ -11,12 +11,12 @@ import (
 var (
 	Progname         = filepath.Base(os.Args[0])
 	UsageArgs        = "cmd [arg...]"
-	Usage     func() = usageExample
+	Usage     func() = UsageExample
 	cmdname          = "main"
 	exitCode         = 0
 )
 
-func usageExample() {
+func UsageExample() {
 	w := flag.CommandLine.Output()
 	fmt.Fprintf(w, "usage: %s %s\n", Progname, UsageArgs)
 	fmt.Fprintln(w, `cmds:
@@ -24,8 +24,7 @@ func usageExample() {
 	ls [-l] [-d] [path]
 	read path...
 	walk [root]
-note: pattern at glob shuld be quoted.
-`)
+note: A pattern following glob should be quoted.`)
 }
 
 func Main(fsys fs.FS, args []string) {
