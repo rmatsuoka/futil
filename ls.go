@@ -10,8 +10,8 @@ import (
 
 var (
 	lsFlagSet = flag.NewFlagSet("ls", flag.ExitOnError)
-	lslFlag   = lsFlagSet.Bool("l", false, "print long format")
-	lsdFlag   = lsFlagSet.Bool("d", false, "If arg is a dir, print it instead of its entrys")
+	lLsFlag   = lsFlagSet.Bool("l", false, "List in long format.")
+	dLsFlag   = lsFlagSet.Bool("d", false, "If arg is a dir, list it, not its entrys.")
 
 	// for long format
 	modeWidth = 0
@@ -42,7 +42,7 @@ func ls(fsys fs.FS, name string) error {
 	}
 
 	var infos []fs.FileInfo
-	if !info.IsDir() || *lsdFlag {
+	if !info.IsDir() || *dLsFlag {
 		infos = append(infos, info)
 	} else {
 		dirs, err := fs.ReadDir(fsys, name)
@@ -61,12 +61,12 @@ func ls(fsys fs.FS, name string) error {
 
 	// future: add sort infos
 
-	if *lslFlag {
+	if *lLsFlag {
 		doWidth(infos)
 	}
 
 	for _, i := range infos {
-		if *lslFlag {
+		if *lLsFlag {
 			fmt.Printf("%s\n", lsLongFmt(i))
 		} else {
 			fmt.Printf("%v\n", i.Name())
