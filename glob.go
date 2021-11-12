@@ -1,19 +1,21 @@
-package gofs
+package futil
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 )
 
-func globMain(fsys fs.FS, args []string) {
+func globMain(fsys fs.FS, w, ew io.Writer, args []string) error {
 	if len(args) == 0 {
-		errExit(fmt.Errorf("missing argument"))
+		return fmt.Errorf("missing argument")
 	}
 	m, err := fs.Glob(fsys, args[0])
 	if err != nil {
-		errExit(err)
+		return err
 	}
 	for _, p := range m {
-		fmt.Println(p)
+		fmt.Fprintln(w, p)
 	}
+	return nil
 }

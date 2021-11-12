@@ -1,25 +1,22 @@
-package gofs
+package futil
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 )
 
-func walkMain(fsys fs.FS, args []string) {
-	var root string
-	if len(args) == 0 {
-		root = "."
-	} else {
+func walkMain(fsys fs.FS, w io.Writer, ew io.Writer, args []string) error {
+	root := "."
+	if len(args) > 0 {
 		root = args[0]
 	}
-	err := fs.WalkDir(fsys, root, func(path string, d fs.DirEntry, err error) error {
+
+	return fs.WalkDir(fsys, root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			warn(err)
+			fmt.Fprintf(ew, "walk: %v", err)
 		}
-		fmt.Println(path)
-		return nil
+		_, printErr := fmt.Fprintln(w, path)
+		return printErr
 	})
-	if err != nil {
-		errExit(err)
-	}
 }

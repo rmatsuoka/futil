@@ -1,3 +1,3 @@
-module github.com/rmatsuoka/gofs
+module github.com/rmatsuoka/futil
 
 go 1.17

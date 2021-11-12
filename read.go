@@ -1,29 +1,21 @@
-package gofs
+package futil
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
-	"os"
 )
 
-func readMain(fsys fs.FS, args []string) {
-	if len(args) == 0 {
-		errExit(fmt.Errorf("missing argument"))
+func readMain(fsys fs.FS, w, ew io.Writer, args []string) error {
+	if len(args) < 1 {
+		return errMissArg
 	}
-	for _, fname := range args {
-		f, err := fsys.Open(fname)
-		if err != nil {
-			warn(err)
-			exitCode = 1
-			continue
-		}
-		if s, _ := f.Stat(); s.IsDir() {
-			warn(fmt.Errorf("%s: is a directory", fname))
-			exitCode = 1
-			continue
-		}
-		io.Copy(os.Stdout, f)
-		f.Close()
+
+	f, err := fsys.Open(args[0])
+	if err != nil {
+		return err
 	}
+	defer f.Close() // ignore err
+
+	_, err = io.Copy(w, f)
+	return err
 }

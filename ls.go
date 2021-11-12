@@ -1,81 +1,80 @@
-package gofs
+package futil
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"strconv"
 	"time"
 )
 
-var (
-	lsFlagSet = flag.NewFlagSet("ls", flag.ExitOnError)
-	lLsFlag   = lsFlagSet.Bool("l", false, "List in long format.")
-	dLsFlag   = lsFlagSet.Bool("d", false, "If arg is a dir, list it, not its entrys.")
+func lsMain(fsys fs.FS, w, ew io.Writer, args []string) error {
+	lsFlagSet := flag.NewFlagSet("ls", flag.ContinueOnError)
+	lsFlagSet.SetOutput(ew)
+	lLsFlag := lsFlagSet.Bool("l", false, "List in long format.")
+	dLsFlag := lsFlagSet.Bool("d", false, "If arg is a dir, list it, not its entrys.")
 
-	// for long format
-	modeWidth = 0
-	sizeWidth = 0
-)
-
-func lsMain(fsys fs.FS, args []string) {
-	if err := lsFlagSet.Parse(args); err != nil {
-		errExit(err)
+	err := lsFlagSet.Parse(args)
+	if err == flag.ErrHelp {
+		return nil
+	}
+	if err != nil {
+		return err
 	}
 
-	var p string
-	if lsFlagSet.NArg() == 0 {
-		p = "."
-	} else {
-		p = lsFlagSet.Args()[0]
+	name := "."
+	if lsFlagSet.NArg() > 0 {
+		name = lsFlagSet.Args()[0]
 	}
 
-	if err := ls(fsys, p); err != nil {
-		errExit(err)
-	}
-}
-
-func ls(fsys fs.FS, name string) error {
 	info, err := fs.Stat(fsys, name)
 	if err != nil {
 		return err
 	}
 
-	var infos []fs.FileInfo
+	var des []fs.DirEntry
 	if !info.IsDir() || *dLsFlag {
-		infos = append(infos, info)
+		des = append(des, fs.FileInfoToDirEntry(info))
 	} else {
-		dirs, err := fs.ReadDir(fsys, name)
+		var err error
+		des, err = fs.ReadDir(fsys, name)
 		if err != nil {
 			return err
 		}
-		for _, d := range dirs {
-			i, err := d.Info()
-			if err != nil {
-				warn(err)
-				continue
+	}
+
+	if !*lLsFlag {
+		for _, de := range des {
+			if _, err := fmt.Fprintln(w, de.Name()); err != nil {
+				return err
 			}
-			infos = append(infos, i)
+		}
+		return nil
+	}
+
+	infos := make([]fs.FileInfo, 0, len(des))
+	for _, de := range des {
+		i, err := de.Info()
+		if err != nil {
+			return err
+		}
+		infos = append(infos, i)
+	}
+
+	longfmts := LsLongFormats(infos)
+	for i := range infos {
+		_, err := fmt.Fprintf(w, "%s %s\n", longfmts[i], infos[i].Name())
+		if err != nil {
+			return err
 		}
 	}
 
-	// future: add sort infos
-
-	if *lLsFlag {
-		doWidth(infos)
-	}
-
-	for _, i := range infos {
-		if *lLsFlag {
-			fmt.Printf("%s\n", lsLongFmt(i))
-		} else {
-			fmt.Printf("%v\n", i.Name())
-		}
-	}
 	return nil
 }
 
-func doWidth(infos []fs.FileInfo) {
+func LsLongFormats(infos []fs.FileInfo) []string {
+	var modeWidth, sizeWidth int
 	for _, info := range infos {
 		m := len(info.Mode().String())
 		if modeWidth < m {
@@ -87,22 +86,23 @@ func doWidth(infos []fs.FileInfo) {
 			sizeWidth = s
 		}
 	}
-}
 
-func lsLongFmt(info fs.FileInfo) string {
-	t := info.ModTime()
-	var timeStr string
-	if t.Year() == time.Now().Year() {
-		timeStr = t.Format("Jan _2 15:04")
-	} else {
-		timeStr = t.Format("Jan _2  2006")
+	longfmts := make([]string, 0, len(infos))
+	for _, info := range infos {
+		t := info.ModTime()
+		var timeStr string
+		if t.Year() == time.Now().Year() {
+			timeStr = t.Format("Jan _2 15:04")
+		} else {
+			timeStr = t.Format("Jan _2  2006")
+		}
+
+		longfmts = append(longfmts, fmt.Sprintf("%-*s %*d %s",
+			modeWidth,
+			info.Mode().String(),
+			sizeWidth,
+			info.Size(),
+			timeStr))
 	}
-
-	return fmt.Sprintf("%-*s %*d %s %s",
-		modeWidth,
-		info.Mode().String(),
-		sizeWidth,
-		info.Size(),
-		timeStr,
-		info.Name())
+	return longfmts
 }

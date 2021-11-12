@@ -1,69 +1,55 @@
-package gofs
+package futil
 
 import (
-	"flag"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
+)
+
+const (
+	CommandList = `get [-a] [-n] path [local_path]
+glob pattern
+ls [-d] [-l] [path]
+read path
+walk [root]
+help
+exit`
 )
 
 var (
-	Progname         = filepath.Base(os.Args[0])
-	UsageArgs        = "cmd [arg...]"
-	Usage     func() = UsageExample
-	cmdname          = "main"
-	exitCode         = 0
+	// run exit command
+	Exit = errors.New("exit")
+
+	errMissArg = errors.New("missing argument")
 )
 
-func UsageExample() {
-	w := flag.CommandLine.Output()
-	fmt.Fprintf(w, "usage: %s %s\n", Progname, UsageArgs)
-	fmt.Fprintln(w, `cmds:
-	glob 'pattern'
-	ls [-l] [-d] [path]
-	read path...
-	walk [root]
-note: A pattern following glob should be quoted.`)
-}
-
-func Main(fsys fs.FS, args []string) {
-	gofsFlag := flag.NewFlagSet(Progname, flag.ExitOnError)
-	gofsFlag.Usage = Usage
-
-	if err := gofsFlag.Parse(args); err != nil {
-		errExit(err)
-	}
-	pargs := gofsFlag.Args()
-	if len(pargs) == 0 {
-		gofsFlag.Usage()
-		os.Exit(1)
+func Eval(fsys fs.FS, w io.Writer, ew io.Writer, args []string) error {
+	if len(args) == 0 {
+		return errMissArg
 	}
 
-	cmdname = pargs[0]
-	switch pargs[0] {
+	var err error
+	switch args[0] {
 	case "ls":
-		lsMain(fsys, args[1:])
+		err = lsMain(fsys, w, ew, args[1:])
+	case "get":
+		err = getMain(fsys, w, ew, args[1:])
 	case "glob":
-		globMain(fsys, args[1:])
+		err = globMain(fsys, w, ew, args[1:])
 	case "read":
-		readMain(fsys, args[1:])
+		err = readMain(fsys, w, ew, args[1:])
 	case "walk":
-		walkMain(fsys, args[1:])
+		err = walkMain(fsys, w, ew, args[1:])
+	case "help":
+		_, err = fmt.Fprintln(ew, CommandList)
+	case "exit":
+		return Exit
 	default:
-		errExit(fmt.Errorf("No such command"))
+		err = fmt.Errorf("no such command")
 	}
-	os.Exit(exitCode)
-}
-
-func warn(e error) {
-	fmt.Fprintf(os.Stderr, "%s: %s: %v\n", Progname, cmdname, e)
-}
-
-func errExit(e error) {
-	warn(e)
-	if exitCode == 0 {
-		exitCode = 1
+	if err != nil {
+		return fmt.Errorf("%s: %v", args[0], err)
 	}
-	os.Exit(exitCode)
+	return nil
 }
